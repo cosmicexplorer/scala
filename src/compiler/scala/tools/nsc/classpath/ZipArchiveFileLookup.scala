@@ -36,7 +36,7 @@ trait ZipArchiveFileLookup[FileEntryType <: ClassRepresentation] extends ClassPa
 
   private val archive = new FileZipArchive(zipFile, release)
 
-  override private[nsc] def packages(inPackage: String): Seq[PackageEntry] = {
+  override protected def packagesImpl(inPackage: String): Seq[PackageEntry] = {
     val prefix = PackageNameUtils.packagePrefix(inPackage)
     for {
       dirEntry <- findDirEntry(inPackage).toSeq
@@ -57,8 +57,8 @@ trait ZipArchiveFileLookup[FileEntryType <: ClassRepresentation] extends ClassPa
       if isRequiredFileType(entry)
     } yield createFileEntry(entry)
 
-  override private[nsc] def hasPackage(pkg: String) = findDirEntry(pkg).isDefined
-  override private[nsc] def list(inPackage: String): ClassPathEntries = {
+  override protected def hasPackageImpl(pkg: String) = findDirEntry(pkg).isDefined
+  override protected def listImpl(inPackage: String): ClassPathEntries = {
     val foundDirEntry = findDirEntry(inPackage)
 
     foundDirEntry map { dirEntry =>

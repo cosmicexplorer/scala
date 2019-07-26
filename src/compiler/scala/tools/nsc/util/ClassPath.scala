@@ -39,10 +39,56 @@ trait ClassPath {
    * The `inPackage` string is a full package name, e.g. "" or "scala.collection".
    */
 
-  private[nsc] def hasPackage(pkg: String): Boolean
-  private[nsc] def packages(inPackage: String): Seq[PackageEntry]
-  private[nsc] def classes(inPackage: String): Seq[ClassFileEntry]
-  private[nsc] def sources(inPackage: String): Seq[SourceFileEntry]
+  import ClassPathCaches._
+
+  def cachedDo[A, B, CacheMap <: MethodCache[A, B]](f: A => B, cache: CacheMap)(
+    isCacheable: (A, B) => Boolean
+  ): A => B = { in =>
+    Option(cache.get(in)).getOrElse {
+      val computed: B = f(in)
+      if (!isCacheable(in, computed)) {
+        // If the class deems the result uncacheable for some reason, just return it.
+        computed
+      } else Option(cache.putIfAbsent(in, computed)) match {
+        // https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ConcurrentHashMap.html#putIfAbsent(K,%20V)
+        // No value was previously there -- the current value is the canonical one.
+        case None => computed
+        // There was a value that was computed since we last checked cache.get(). We drop the value
+        // we have just computed and use the one that won the race.
+        case Some(concurrentlyComputedResult) =>
+          // TODO: debug log this?
+          // debuglog(s"dropping current result $computed for concurrent result $concurrentlyComputedResult!")
+          concurrentlyComputedResult
+      }
+    }
+  }
+
+  def perInstanceCachedDo[A, B, PerInstanceCacheMap <: PerInstanceMethodCache[A, B]](f: A => B, cache: PerInstanceCacheMap)(
+    isCacheable: (A, B) => Boolean
+  ): A => B = { in =>
+    val req = (this -> in)
+    Option(cache.get(req)).getOrElse {
+      val computed: B = f(in)
+      if (!isCacheable(in, computed)) {
+        computed
+      } else Option(cache.putIfAbsent(req, computed)) match {
+        case None => computed
+        case Some(x) => x
+      }
+    }
+  }
+
+  protected def hasPackageImpl(pkg: String): Boolean
+  final private[nsc] val hasPackage = cachedDo(hasPackageImpl, hasPackageCache)((_, wasFound) => wasFound)
+
+  protected def packagesImpl(inPackage: String): Seq[PackageEntry]
+  final private[nsc] val packages = cachedDo(packagesImpl, packagesCache)((pkg, _) => hasPackage(pkg))
+
+  protected def classesImpl(inPackage: String): Seq[ClassFileEntry]
+  final private[nsc] val classes = cachedDo(classesImpl, classesCache)((pkg, _) => hasPackage(pkg))
+
+  protected def sourcesImpl(inPackage: String): Seq[SourceFileEntry]
+  final private[nsc] val sources = cachedDo(sourcesImpl, sourcesCache)((_, sources) => sources.nonEmpty)
 
   /**
    * Returns packages and classes (source or classfile) that are members of `inPackage` (not
@@ -50,8 +96,11 @@ trait ClassPath {
    *
    * This is the main method uses to find classes, see class `PackageLoader`. The
    * `rootMirror.rootLoader` is created with `inPackage = ""`.
-   */
-  private[nsc] def list(inPackage: String): ClassPathEntries
+    */
+  protected def listImpl(inPackage: String): ClassPathEntries
+  final private[nsc] val list = perInstanceCachedDo(listImpl, listCache) { (_, entries) =>
+    entries.packages.nonEmpty || entries.classesAndSources.nonEmpty
+  }
 
   /**
    * Returns the class file and / or source file for a given external name, e.g., "java.lang.String".
@@ -65,7 +114,7 @@ trait ClassPath {
    * https://github.com/sbt/sbt/blob/v0.13.15/compile/interface/src/main/scala/xsbt/CompilerInterface.scala#L249
    * Jason has some improvements for that in the works (https://github.com/scala/bug/issues/10289#issuecomment-310022699)
    */
-  def findClass(className: String): Option[ClassRepresentation] = {
+  protected def findClassImpl(className: String): Option[ClassRepresentation] = {
     // A default implementation which should be overridden, if we can create the more efficient
     // solution for a given type of ClassPath
     val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
@@ -75,6 +124,7 @@ trait ClassPath {
 
     foundClassFromClassFiles orElse findClassInSources
   }
+  final val findClass = cachedDo(findClassImpl, findClassCache)((_, maybeClass) => maybeClass.isDefined)
 
   /**
    * Returns the classfile for an external name, e.g., "java.lang.String". This method does not
@@ -84,21 +134,40 @@ trait ClassPath {
    * are entered with a `ClassfileLoader` that parses the classfile returned by this method.
    * It is also used in the backend, by the inliner, to obtain the bytecode when inlining from the
    * classpath. It's also used by scalap.
-   */
-  def findClassFile(className: String): Option[AbstractFile]
+    */
+  protected def findClassFileImpl(className: String): Option[AbstractFile]
+  final val findClassFile = cachedDo(findClassFileImpl, findClassFileCache)((_, maybeFile) => maybeFile.isDefined)
 
   def asClassPathStrings: Seq[String]
 
   /** The whole classpath in the form of one String.
     */
-  def asClassPathString: String = ClassPath.join(asClassPathStrings: _*)
+  lazy val asClassPathString: String = ClassPath.join(asClassPathStrings: _*)
   // for compatibility purposes
   @deprecated("use asClassPathString instead of this one", "2.11.5")
-  def asClasspathString: String = asClassPathString
+  lazy val asClasspathString: String = asClassPathString
 
   /** The whole sourcepath in the form of one String.
     */
   def asSourcePathString: String
+}
+
+object ClassPathCaches {
+  import scala.tools.nsc.classpath._
+
+  import java.util.concurrent.ConcurrentHashMap
+
+  type MethodCache[A, B] = ConcurrentHashMap[A, B]
+
+  type PerInstanceMethodCache[A, B] = ConcurrentHashMap[(ClassPath, A), B]
+
+  val hasPackageCache: MethodCache[String, Boolean] = new ConcurrentHashMap
+  val packagesCache: MethodCache[String, Seq[PackageEntry]] = new ConcurrentHashMap
+  val classesCache: MethodCache[String, Seq[ClassFileEntry]] = new ConcurrentHashMap
+  val sourcesCache: MethodCache[String, Seq[SourceFileEntry]] = new ConcurrentHashMap
+  val listCache: PerInstanceMethodCache[String, ClassPathEntries] = new ConcurrentHashMap
+  val findClassCache: MethodCache[String, Option[ClassRepresentation]] = new ConcurrentHashMap
+  val findClassFileCache: MethodCache[String, Option[AbstractFile]] = new ConcurrentHashMap
 }
 
 object ClassPath {

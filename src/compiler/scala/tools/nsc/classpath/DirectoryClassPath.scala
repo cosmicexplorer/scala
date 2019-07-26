@@ -57,9 +57,9 @@ trait DirectoryLookup[FileEntryType <: ClassRepresentation] extends ClassPath {
       getSubDir(packageDirName)
     }
   }
-  override private[nsc] def hasPackage(pkg: String) = getDirectory(pkg).isDefined
+  override def hasPackageImpl(pkg: String): Boolean = getDirectory(pkg).isDefined
 
-  private[nsc] def packages(inPackage: String): Seq[PackageEntry] = {
+  override def packagesImpl(inPackage: String): Seq[PackageEntry] = {
     val dirForPackage = getDirectory(inPackage)
     val nestedDirs: Array[F] = dirForPackage match {
       case None => emptyFiles
@@ -78,7 +78,7 @@ trait DirectoryLookup[FileEntryType <: ClassRepresentation] extends ClassPath {
     files.map(f => createFileEntry(toAbstractFile(f)))
   }
 
-  private[nsc] def list(inPackage: String): ClassPathEntries = {
+  override def listImpl(inPackage: String): ClassPathEntries = {
     val dirForPackage = getDirectory(inPackage)
     val files: Array[F] = dirForPackage match {
       case None => emptyFiles
@@ -193,11 +193,11 @@ final class JrtClassPath(fs: java.nio.file.FileSystem) extends ClassPath with No
   }
 
   /** Empty string represents root package */
-  override private[nsc] def hasPackage(pkg: String) = packageToModuleBases.contains(pkg)
-  override private[nsc] def packages(inPackage: String): Seq[PackageEntry] = {
+  override protected def hasPackageImpl(pkg: String) = packageToModuleBases.contains(pkg)
+  override protected def packagesImpl(inPackage: String): Seq[PackageEntry] = {
     packageToModuleBases.keysIterator.filter(pack => packageContains(inPackage, pack)).map(PackageEntryImpl(_)).toVector
   }
-  private[nsc] def classes(inPackage: String): Seq[ClassFileEntry] = {
+  override protected def classesImpl(inPackage: String): Seq[ClassFileEntry] = {
     if (inPackage == "") Nil
     else {
       packageToModuleBases.getOrElse(inPackage, Nil).flatMap(x =>
@@ -206,7 +206,7 @@ final class JrtClassPath(fs: java.nio.file.FileSystem) extends ClassPath with No
     }
   }
 
-  override private[nsc] def list(inPackage: String): ClassPathEntries =
+  override protected def listImpl(inPackage: String): ClassPathEntries =
     if (inPackage == "") ClassPathEntries(packages(inPackage), Nil)
     else ClassPathEntries(packages(inPackage), classes(inPackage))
 
@@ -215,7 +215,7 @@ final class JrtClassPath(fs: java.nio.file.FileSystem) extends ClassPath with No
   // java models them as entries in the new "module path", we'll probably need to follow this.
   def asClassPathStrings: Seq[String] = Nil
 
-  def findClassFile(className: String): Option[AbstractFile] = {
+  override protected def findClassFileImpl(className: String): Option[AbstractFile] = {
     if (!className.contains(".")) None
     else {
       val (inPackage, _) = separatePkgAndClassNames(className)
@@ -257,11 +257,11 @@ final class CtSymClassPath(ctSym: java.nio.file.Path, release: Int) extends Clas
   }
 
   /** Empty string represents root package */
-  override private[nsc] def hasPackage(pkg: String) = packageIndex.contains(pkg)
-  override private[nsc] def packages(inPackage: String): Seq[PackageEntry] = {
+  override protected def hasPackageImpl(pkg: String) = packageIndex.contains(pkg)
+  override protected def packagesImpl(inPackage: String): Seq[PackageEntry] = {
     packageIndex.keysIterator.filter(pack => packageContains(inPackage, pack)).map(PackageEntryImpl(_)).toVector
   }
-  private[nsc] def classes(inPackage: String): Seq[ClassFileEntry] = {
+  override protected def classesImpl(inPackage: String): Seq[ClassFileEntry] = {
     if (inPackage == "") Nil
     else {
       val sigFiles = packageIndex.getOrElse(inPackage, Nil).iterator.flatMap(p =>
@@ -270,14 +270,14 @@ final class CtSymClassPath(ctSym: java.nio.file.Path, release: Int) extends Clas
     }
   }
 
-  override private[nsc] def list(inPackage: String): ClassPathEntries =
+  override protected def listImpl(inPackage: String): ClassPathEntries =
     if (inPackage == "") ClassPathEntries(packages(inPackage), Nil)
     else ClassPathEntries(packages(inPackage), classes(inPackage))
 
   def asURLs: Seq[URL] = Nil
   def asClassPathStrings: Seq[String] = Nil
 
-  def findClassFile(className: String): Option[AbstractFile] = {
+  override protected def findClassFileImpl(className: String): Option[AbstractFile] = {
     if (!className.contains(".")) None
     else {
       val (inPackage, classSimpleName) = separatePkgAndClassNames(className)
@@ -290,9 +290,9 @@ final class CtSymClassPath(ctSym: java.nio.file.Path, release: Int) extends Clas
 }
 
 case class DirectoryClassPath(dir: File) extends JFileDirectoryLookup[ClassFileEntryImpl] with NoSourcePaths {
-  override def findClass(className: String): Option[ClassRepresentation] = findClassFile(className) map ClassFileEntryImpl
+  override def findClassImpl(className: String): Option[ClassRepresentation] = findClassFile(className) map ClassFileEntryImpl
 
-  def findClassFile(className: String): Option[AbstractFile] = {
+  override protected def findClassFileImpl(className: String): Option[AbstractFile] = {
     val relativePath = FileUtils.dirPath(className)
     val classFile = new File(s"$dir/$relativePath.class")
     if (classFile.exists) {
@@ -305,7 +305,7 @@ case class DirectoryClassPath(dir: File) extends JFileDirectoryLookup[ClassFileE
   protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
   protected def isMatchingFile(f: File): Boolean = f.isClass
 
-  private[nsc] def classes(inPackage: String): Seq[ClassFileEntry] = files(inPackage)
+  override protected def classesImpl(inPackage: String): Seq[ClassFileEntry] = files(inPackage)
 }
 
 case class DirectorySourcePath(dir: File) extends JFileDirectoryLookup[SourceFileEntryImpl] with NoClassPaths {
@@ -314,7 +314,7 @@ case class DirectorySourcePath(dir: File) extends JFileDirectoryLookup[SourceFil
   protected def createFileEntry(file: AbstractFile): SourceFileEntryImpl = SourceFileEntryImpl(file)
   protected def isMatchingFile(f: File): Boolean = endsScalaOrJava(f.getName)
 
-  override def findClass(className: String): Option[ClassRepresentation] = findSourceFile(className) map SourceFileEntryImpl
+  override def findClassImpl(className: String): Option[ClassRepresentation] = findSourceFile(className) map SourceFileEntryImpl
 
   private def findSourceFile(className: String): Option[AbstractFile] = {
     val relativePath = FileUtils.dirPath(className)
@@ -329,5 +329,5 @@ case class DirectorySourcePath(dir: File) extends JFileDirectoryLookup[SourceFil
     }
   }
 
-  private[nsc] def sources(inPackage: String): Seq[SourceFileEntry] = files(inPackage)
+  override protected def sourcesImpl(inPackage: String): Seq[SourceFileEntry] = files(inPackage)
 }

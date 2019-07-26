@@ -46,6 +46,7 @@ object Decode {
 
   /** Return the bytes representing the annotation
    */
+  // TODO: this could be a place we could cache!
   def scalaSigAnnotationBytes(name: String): Option[Array[Byte]] = scalaSigAnnotationBytes(name, appLoader)
   def scalaSigAnnotationBytes(name: String, classLoader: ScalaClassLoader): Option[Array[Byte]] = {
     val bytes     = classLoader.classBytes(name)
@@ -103,4 +104,3 @@ object Decode {
     }
   }
 }
-

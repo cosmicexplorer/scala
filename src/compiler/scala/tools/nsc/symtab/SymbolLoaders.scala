@@ -282,6 +282,9 @@ abstract class SymbolLoaders {
       assert(root.isPackageClass, root)
       root.setInfo(new PackageClassInfoType(newScope, root))
 
+      // TODO: this line is showing up in traces as going down into AggregateClassPath#list(), which
+      // then starts doing I/O as it parses classfiles/etc -- THIS CAN BE CACHED!!
+      // (1) memoize all the `trait ClassPath` methods on a per-instance level (for now, just `.list()`)!
       val classPathEntries = classPath.list(packageName)
 
       if (!root.isRoot)

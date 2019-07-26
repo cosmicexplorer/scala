@@ -29,7 +29,7 @@ import scala.tools.nsc.util.ClassRepresentation
  * @param aggregates classpath instances containing entries which this class processes
  */
 case class AggregateClassPath(aggregates: Seq[ClassPath]) extends ClassPath {
-  override def findClassFile(className: String): Option[AbstractFile] = {
+  override protected def findClassFileImpl(className: String): Option[AbstractFile] = {
     val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
     aggregatesForPackage(pkg).iterator.map(_.findClassFile(className)).collectFirst {
       case Some(x) => x
@@ -41,7 +41,7 @@ case class AggregateClassPath(aggregates: Seq[ClassPath]) extends ClassPath {
   }
 
   // This method is performance sensitive as it is used by SBT's ExtractDependencies phase.
-  override def findClass(className: String): Option[ClassRepresentation] = {
+  override def findClassImpl(className: String): Option[ClassRepresentation] = {
     val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
 
     def findEntry(isSource: Boolean): Option[ClassRepresentation] = {
@@ -67,19 +67,20 @@ case class AggregateClassPath(aggregates: Seq[ClassPath]) extends ClassPath {
 
   override def asSourcePathString: String = ClassPath.join(aggregates map (_.asSourcePathString): _*)
 
-  override private[nsc] def packages(inPackage: String): Seq[PackageEntry] = {
+  override protected def packagesImpl(inPackage: String): Seq[PackageEntry] = {
     val aggregatedPackages = aggregates.flatMap(_.packages(inPackage)).distinct
     aggregatedPackages
   }
 
-  override private[nsc] def classes(inPackage: String): Seq[ClassFileEntry] =
+  override protected def classesImpl(inPackage: String): Seq[ClassFileEntry] =
     getDistinctEntries(_.classes(inPackage))
 
-  override private[nsc] def sources(inPackage: String): Seq[SourceFileEntry] =
+  override protected def sourcesImpl(inPackage: String): Seq[SourceFileEntry] =
     getDistinctEntries(_.sources(inPackage))
 
-  override private[nsc] def hasPackage(pkg: String) = aggregates.exists(_.hasPackage(pkg))
-  override private[nsc] def list(inPackage: String): ClassPathEntries = {
+  override protected def hasPackageImpl(pkg: String) = aggregates.exists(_.hasPackage(pkg))
+
+  override protected def listImpl(inPackage: String): ClassPathEntries = {
     val (packages, classesAndSources) = aggregates.map { cp =>
       try {
         cp.list(inPackage)

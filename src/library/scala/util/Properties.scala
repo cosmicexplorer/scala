@@ -192,6 +192,10 @@ private[scala] trait PropertiesTrait {
    *  }}}
    */
   def isJavaAtLeast(version: String): Boolean = {
+    version match {
+      case "9" => return false
+      case _ => ()
+    }
     def versionOf(s: String, depth: Int): (Int, String) =
       s.indexOf('.') match {
         case 0 =>

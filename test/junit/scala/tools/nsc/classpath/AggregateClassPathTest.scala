@@ -26,8 +26,8 @@ class AggregateClassPathTest {
     override def sources(inPackage: String): Seq[SourceFileEntry] = unsupported
     override def classes(inPackage: String): Seq[ClassFileEntry] = unsupported
 
-    override def list(inPackage: String): ClassPathEntries = unsupported
-    override def findClassFile(name: String): Option[AbstractFile] = unsupported
+    override def listImpl(inPackage: String): ClassPathEntries = unsupported
+    override protected def findClassFileImpl(name: String): Option[AbstractFile] = unsupported
 
     override def asClassPathStrings: Seq[String] = unsupported
     override def asSourcePathString: String = unsupported
@@ -45,7 +45,7 @@ class AggregateClassPathTest {
     override def sources(inPackage: String): Seq[SourceFileEntry] = Nil
 
     // we'll ignore packages
-    override def list(inPackage: String): ClassPathEntries = ClassPathEntries(Nil, classes(inPackage))
+    override def listImpl(inPackage: String): ClassPathEntries = ClassPathEntries(Nil, classes(inPackage))
   }
 
   private case class TestSourcePath(virtualPath: String, sourcesInPackage: EntryNamesInPackage*) extends TestClassPathBase {
@@ -59,7 +59,7 @@ class AggregateClassPathTest {
     override def classes(inPackage: String): Seq[ClassFileEntry] = Nil
 
     // we'll ignore packages
-    override def list(inPackage: String): ClassPathEntries = ClassPathEntries(Nil, sources(inPackage))
+    override def listImpl(inPackage: String): ClassPathEntries = ClassPathEntries(Nil, sources(inPackage))
   }
 
   private case class EntryNamesInPackage(inPackage: String)(val names: String*)

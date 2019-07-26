@@ -61,10 +61,10 @@ private[nsc] case class PackageEntryImpl(name: String) extends PackageEntry
 
 private[nsc] trait NoSourcePaths {
   final def asSourcePathString: String = ""
-  final private[nsc] def sources(inPackage: String): Seq[SourceFileEntry] = Seq.empty
+  final protected def sourcesImpl(inPackage: String): Seq[SourceFileEntry] = Seq.empty
 }
 
 private[nsc] trait NoClassPaths {
-  final def findClassFile(className: String): Option[AbstractFile] = None
-  private[nsc] final def classes(inPackage: String): Seq[ClassFileEntry] = Seq.empty
+  final def findClassFileImpl(className: String): Option[AbstractFile] = None
+  protected final def classesImpl(inPackage: String): Seq[ClassFileEntry] = Seq.empty
 }
