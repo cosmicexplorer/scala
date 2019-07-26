@@ -1046,6 +1046,7 @@ lazy val dist = (project in file("dist"))
 def configureAsSubproject(project: Project): Project = {
   val base = file(".") / "src" / project.id
   (project in base)
+    .settings(disableDocs)
     .settings(scalaSubprojectSettings)
     .settings(generatePropertiesFileSettings)
 }
