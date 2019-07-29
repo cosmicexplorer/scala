@@ -82,10 +82,10 @@ trait ClassPath {
   final private[nsc] val hasPackage = cachedDo(hasPackageImpl, hasPackageCache)((_, wasFound) => wasFound)
 
   protected def packagesImpl(inPackage: String): Seq[PackageEntry]
-  final private[nsc] val packages = cachedDo(packagesImpl, packagesCache)((pkg, _) => hasPackage(pkg))
+  final private[nsc] val packages = cachedDo(packagesImpl, packagesCache)((_, packages) => packages.nonEmpty)
 
   protected def classesImpl(inPackage: String): Seq[ClassFileEntry]
-  final private[nsc] val classes = cachedDo(classesImpl, classesCache)((pkg, _) => hasPackage(pkg))
+  final private[nsc] val classes = cachedDo(classesImpl, classesCache)((_, classFiles) => classFiles.nonEmpty)
 
   protected def sourcesImpl(inPackage: String): Seq[SourceFileEntry]
   final private[nsc] val sources = cachedDo(sourcesImpl, sourcesCache)((_, sources) => sources.nonEmpty)
