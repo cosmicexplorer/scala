@@ -25,11 +25,13 @@ import scala.tools.nsc.io.AbstractFile
  * @author Philippe Altherr
  * @version 1.0, 23/03/2004
  */
-class AbstractFileReader(val file: AbstractFile) {
+trait AbstractFileReader {
+
+  val file: AbstractFile
 
   /** the buffer containing the file
-   */
-  val buf: Array[Byte] = file.toByteArray
+    */
+  val buf: Array[Byte]
 
   /** the current input pointer
    */
@@ -91,4 +93,38 @@ class AbstractFileReader(val file: AbstractFile) {
    */
   def skip(n: Int) { bp += n }
 
+}
+
+case class MemoryBackedFileReader private (
+  override val file: AbstractFile,
+  override val buf: Array[Byte]
+) extends AbstractFileReader
+
+object MemoryBackedFileReader {
+  import java.io._
+  import java.nio.file._
+  import rsc.output._
+  import rsc.report._
+
+  private lazy val cache: InMemoryOutputCache = StaticCache.getCache
+
+  private val logFile = new File("/Users/dmcclanahan/workspace/s3/log.txt").toPath
+
+  private def logString(msg: String): Unit = if (false) {
+    Files.write(logFile, s"$msg\n".getBytes, StandardOpenOption.APPEND)
+  }
+
+  def apply(file: AbstractFile): MemoryBackedFileReader = {
+    val normPath = NormalizedPathForCaching(new File(file.path).toPath)
+    val buf = cache.findPath(normPath) match {
+      case Some(x) =>
+        logString(s"scalasig bytes were found for path $normPath (${cache})!")
+        x
+      case None =>
+        logString(s"scalasig bytes were NOT found for path $normPath (${cache})!")
+        logString(cache.keysAsStr)
+        file.toByteArray
+    }
+    new MemoryBackedFileReader(file, buf)
+  }
 }

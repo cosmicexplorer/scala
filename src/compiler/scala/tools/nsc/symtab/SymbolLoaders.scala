@@ -14,7 +14,8 @@ package scala.tools.nsc
 package symtab
 
 import classfile.ClassfileParser
-import java.io.IOException
+import java.io._
+import java.nio.file._
 import scala.reflect.internal.MissingRequirementError
 import scala.reflect.io.{AbstractFile, NoAbstractFile}
 import scala.tools.nsc.util.{ClassPath, ClassRepresentation}
@@ -278,13 +279,12 @@ abstract class SymbolLoaders {
       s"package loader $shownPackageName"
     }
 
+    // FIXME: inject the rsc `Symtab` object into here in order to check whether this symbol was
+    // already loaded!!!
     protected def doComplete(root: Symbol) {
       assert(root.isPackageClass, root)
       root.setInfo(new PackageClassInfoType(newScope, root))
 
-      // TODO: this line is showing up in traces as going down into AggregateClassPath#list(), which
-      // then starts doing I/O as it parses classfiles/etc -- THIS CAN BE CACHED!!
-      // (1) memoize all the `trait ClassPath` methods on a per-instance level (for now, just `.list()`)!
       val classPathEntries = classPath.list(packageName)
 
       if (!root.isRoot)
