@@ -52,7 +52,6 @@ val junitInterfaceDep = "com.novocode"           % "junit-interface" % "0.11"   
 val scalacheckDep     = "org.scalacheck"         % "scalacheck_2.12" % "1.13.4"                          % "test"
 val jolDep            = "org.openjdk.jol"        % "jol-core"        % "0.5"
 val asmDep            = "org.scala-lang.modules" % "scala-asm"       % versionProps("scala-asm.version")
-val rscDep            = "com.twitter"            %% "rsc"            % "0.0.0-794-2aa0b91e-20190801-2123"
 val jlineDep          = "jline"                  % "jline"           % versionProps("jline.version")
 val antDep            = "org.apache.ant"         % "ant"             % "1.9.4"
 
@@ -461,7 +460,7 @@ lazy val compiler = configureAsSubproject(project)
   .settings(
     name := "scala-compiler",
     description := "Scala Compiler",
-    libraryDependencies ++= Seq(antDep, asmDep, rscDep),
+    libraryDependencies ++= Seq(antDep, asmDep),
     // These are only needed for the POM:
     libraryDependencies ++= Seq(scalaXmlDep, jlineDep % "optional"),
     buildCharacterPropertiesFile := (resourceManaged in Compile).value / "scala-buildcharacter.properties",

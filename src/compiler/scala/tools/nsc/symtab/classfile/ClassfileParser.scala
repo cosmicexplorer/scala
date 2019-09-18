@@ -152,7 +152,7 @@ abstract class ClassfileParser {
   def parse(file: AbstractFile, clazz: ClassSymbol, module: ModuleSymbol): Unit = {
     this.file = file
     pushBusy(clazz) {
-      this.in           = MemoryBackedFileReader(file)
+      this.in           = new AbstractFileReader(file)
       this.clazz        = clazz
       this.staticModule = module
       this.isScala      = false
