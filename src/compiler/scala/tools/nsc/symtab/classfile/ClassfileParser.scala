@@ -108,11 +108,11 @@ abstract class ClassfileParser {
   }
 
   private def handleMissing(e: MissingRequirementError) = {
-    if (settings.debug) e.printStackTrace
+    e.printStackTrace
     throw new IOException(s"Missing dependency '${e.req}', required by $file")
   }
   private def handleError(e: Exception) = {
-    if (settings.debug) e.printStackTrace()
+    e.printStackTrace()
     throw new IOException(s"class file '$file' is broken\n(${e.getClass}/${e.getMessage})")
   }
   private def mismatchError(c: Symbol) = {
